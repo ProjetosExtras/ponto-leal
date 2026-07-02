@@ -536,7 +536,7 @@ export const generateEspelhoPDF = async (employeeId?: string, referenceDate?: st
                 isSegSex08_12 = true;
             }
 
-            if (!hasExplicitConfig && (empCode === '18' || empCode === '19' || empCode === '20')) {
+            if (!hasExplicitConfig && (empCode === '19' || empCode === '20')) {
                 isSegDom0630_1550 = true;
                 is12x36 = false;
             }
@@ -695,9 +695,37 @@ export const generateEspelhoPDF = async (employeeId?: string, referenceDate?: st
                      if (mins <= 360) {
                         return `<tr><td>${label}</td><td>${cfg.start}</td><td>${cfg.end}</td><td> - </td><td> - </td></tr>`;
                      }
+
+                     // If shift is longer than 8h20m (500 mins), split into 2 parts with 2h lunch break
+                     if (mins > 500) {
+                         let firstEnd = '12:00';
+                         let secondStart = '14:00';
+                         // If start time is 07:00 and end is 16:20, use fixed 12:00-14:00 lunch
+                         if (cfg.start === '07:00' && cfg.end === '16:20') {
+                             firstEnd = '12:00';
+                             secondStart = '14:00';
+                         } else {
+                             const totalWorkMins = mins - 120;
+                             const firstPartMins = totalWorkMins / 2;
+                             const firstPartEndH = h1 + Math.floor((m1 + firstPartMins) / 60);
+                             const firstPartEndM = (m1 + firstPartMins) % 60;
+                             const secondPartStartH = firstPartEndH + 2;
+                             const secondPartStartM = firstPartEndM;
+                             firstEnd = `${String(firstPartEndH).padStart(2, '0')}:${String(firstPartEndM).padStart(2, '0')}`;
+                             secondStart = `${String(secondPartStartH).padStart(2, '0')}:${String(secondPartStartM).padStart(2, '0')}`;
+                         }
+                         return `<tr><td>${label}</td><td>${cfg.start}</td><td>${firstEnd}</td><td>${secondStart}</td><td>${cfg.end}</td></tr>`;
+                     }
                      
-                     // If shift is longer, render as Entry 1 / Exit 2 (Split/Long)
-                     return `<tr><td>${label}</td><td>${cfg.start}</td><td> - </td><td> - </td><td>${cfg.end}</td></tr>`;
+                     // If shift is longer than 6h but ≤8h20m, render as Entry 1 / Exit 2 with 1h lunch
+                     const firstPartMins = (mins - 60) / 2;
+                     const firstPartEndH = h1 + Math.floor((m1 + firstPartMins) / 60);
+                     const firstPartEndM = (m1 + firstPartMins) % 60;
+                     const secondPartStartH = firstPartEndH + 1;
+                     const secondPartStartM = firstPartEndM;
+                     const firstEnd = `${String(firstPartEndH).padStart(2, '0')}:${String(firstPartEndM).padStart(2, '0')}`;
+                     const secondStart = `${String(secondPartStartH).padStart(2, '0')}:${String(secondPartStartM).padStart(2, '0')}`;
+                     return `<tr><td>${label}</td><td>${cfg.start}</td><td>${firstEnd}</td><td>${secondStart}</td><td>${cfg.end}</td></tr>`;
                  }).join('');
             } else if (isSegSex716Sab812) {
                  scheduleRows = [
@@ -971,7 +999,8 @@ export const generateEspelhoPDF = async (employeeId?: string, referenceDate?: st
                         const [h2, m2] = cfg.end.split(':').map(Number);
                         let totalMins = (h2 * 60 + m2) - (h1 * 60 + m1);
                         if (totalMins < 0) totalMins += 1440; // Handle cross-midnight if needed, though weekly usually doesn't
-                        expectedMinutes = totalMins > 360 ? totalMins - 60 : totalMins;
+                        // For shifts longer than 8h20m (500 mins), subtract 2h lunch break, otherwise subtract 1h
+                        expectedMinutes = totalMins > 500 ? totalMins - 120 : (totalMins > 360 ? totalMins - 60 : totalMins);
                         if (expectedMinutes < 0) expectedMinutes = 0;
                     }
                 } else if (isSegSex716Sab812) {
