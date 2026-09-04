@@ -928,6 +928,28 @@ export const generateEspelhoPDF = async (employeeId?: string, referenceDate?: st
                 return Math.round(minutes * (60 / 52.5));
             };
 
+            let effectiveStartDate: Date | null = null;
+            {
+                const stripTime = (d: Date) => {
+                    const x = new Date(d.getTime());
+                    x.setHours(0, 0, 0, 0);
+                    return x;
+                };
+                const firstEntryTs = entries.length > 0
+                    ? Math.min(...entries.map((e) => new Date(e.timestamp).getTime()))
+                    : null;
+                const admStr = empData.admission_date ? String(empData.admission_date).split('T')[0] : null;
+                const admDate = admStr ? stripTime(new Date(`${admStr}T00:00:00`)) : null;
+                const firstEntryDate = firstEntryTs !== null ? stripTime(new Date(firstEntryTs)) : null;
+                if (admDate && firstEntryDate) {
+                    effectiveStartDate = admDate.getTime() > firstEntryDate.getTime() ? admDate : firstEntryDate;
+                } else if (admDate) {
+                    effectiveStartDate = admDate;
+                } else if (firstEntryDate) {
+                    effectiveStartDate = firstEntryDate;
+                }
+            }
+
             daysInMonth.forEach(day => {
                 const dayStr = format(day, 'dd/MM/yy - iii', { locale: ptBR });
                 const dow = getDay(day);
@@ -957,6 +979,19 @@ export const generateEspelhoPDF = async (employeeId?: string, referenceDate?: st
                 
                 const hasAnyEntry = dayEntries.length > 0;
                 const isPast = day.getTime() < todayStart.getTime();
+
+                let isPreAdmissionDay = false;
+                if (effectiveStartDate && isPast && !hasAnyEntry) {
+                    const stripTime = (d: Date) => {
+                        const x = new Date(d.getTime());
+                        x.setHours(0, 0, 0, 0);
+                        return x;
+                    };
+                    const dayDate = stripTime(new Date(day.getTime()));
+                    if (dayDate.getTime() < effectiveStartDate.getTime()) {
+                        isPreAdmissionDay = true;
+                    }
+                }
 
                 // Calculate Hours
                 const isId3 = empCode === '3';
@@ -1348,7 +1383,7 @@ export const generateEspelhoPDF = async (employeeId?: string, referenceDate?: st
                 }
 
                 let normaisMinutes = 0;
-                if (shouldWork) {
+                if (shouldWork && !isPreAdmissionDay) {
                     normaisMinutes = Math.min(effectiveWorkedMinutes, expectedMinutes);
                 }
 
@@ -1356,7 +1391,12 @@ export const generateEspelhoPDF = async (employeeId?: string, referenceDate?: st
                 let faltasMinutes = 0;
                 let atrasoMinutes = 0;
 
-                if (shouldWork && isPast && !hasAnyEntry && !hasAbono) {
+                if (isPreAdmissionDay) {
+                    faltasMinutes = 0;
+                    atrasoMinutes = 0;
+                    normaisMinutes = 0;
+                    extrasMinutes = 0;
+                } else if (shouldWork && isPast && !hasAnyEntry && !hasAbono) {
                     faltasMinutes = expectedMinutes;
                     atrasoMinutes = faltasMinutes;
                 } else if (shouldWork && hasAnyEntry) {
@@ -1415,9 +1455,9 @@ export const generateEspelhoPDF = async (employeeId?: string, referenceDate?: st
                 totalNormais += normaisMinutes;
                 totalFaltas += faltasMinutes;
                 totalExtras += extrasMinutes;
-                totalAdicionalNoturno += nightMinutes;
+                if (!isPreAdmissionDay) totalAdicionalNoturno += nightMinutes;
                 totalAtrasos += atrasoMinutes;
-                totalTrabalhadas += effectiveWorkedMinutes;
+                if (!isPreAdmissionDay) totalTrabalhadas += effectiveWorkedMinutes;
 
                 const normalizeText = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
                 const justificationsList = dayEntries.map(e => e.justification).filter((j): j is string => !!j && String(j).trim().length > 0);
@@ -1452,7 +1492,10 @@ export const generateEspelhoPDF = async (employeeId?: string, referenceDate?: st
                     timeCells = `<td colspan="4" style="text-align: center; font-weight: 600;">${onlyFeriasJustification ? 'FÉRIAS' : 'ABONO'}</td>`;
                 }
 
-                if (!hasAnyEntry) {
+                if (isPreAdmissionDay) {
+                    timeCells = `<td colspan="4" style="text-align: center; color: #888; letter-spacing: 2px;">FOLGA</td>`;
+                    if (!obsParts.includes('FOLGA')) obsParts.push('FOLGA');
+                } else if (!hasAnyEntry) {
                     if (!shouldWork) {
                         timeCells = `<td colspan="4" style="text-align: center; color: #888; letter-spacing: 2px;">FOLGA</td>`;
                         if (!(dow === 6 && isSaturdayAlternating) && !obsParts.includes('FOLGA')) {
@@ -1466,12 +1509,12 @@ export const generateEspelhoPDF = async (employeeId?: string, referenceDate?: st
                 const normais = normaisMinutes > 0 ? formatMinutes(normaisMinutes) : '';
                 const faltas = faltasMinutes > 0 ? formatMinutes(faltasMinutes) : '';
                 const extras = extrasMinutes > 0 ? formatMinutes(extrasMinutes) : '';
-                const adNot = nightMinutes > 0 ? formatMinutes(nightMinutes) : '';
+                const adNot = (!isPreAdmissionDay && nightMinutes > 0) ? formatMinutes(nightMinutes) : '';
                 const obs = obsParts.join(' | ');
 
-                const intervalStrBase = effectiveIntervalMinutes > 0 ? formatMinutes(effectiveIntervalMinutes) : '';
+                const intervalStrBase = (!isPreAdmissionDay && effectiveIntervalMinutes > 0) ? formatMinutes(effectiveIntervalMinutes) : '';
                 const intervalStr = intervalPreAssinalado ? `${intervalStrBase}^` : intervalStrBase;
-                const totalStr = effectiveWorkedMinutes > 0 ? formatMinutes(effectiveWorkedMinutes) : '';
+                const totalStr = (!isPreAdmissionDay && effectiveWorkedMinutes > 0) ? formatMinutes(effectiveWorkedMinutes) : '';
 
                 html += `
                     <tr class="${rowClass}">
@@ -1774,6 +1817,28 @@ export const generateRelatorioExtrasPDF = async (employeeId: string, monthStr: s
 
              const consumedEntryIds = new Set<string>();
 
+             let effectiveStartDate: Date | null = null;
+             {
+                 const stripTime = (d: Date) => {
+                     const x = new Date(d.getTime());
+                     x.setHours(0, 0, 0, 0);
+                     return x;
+                 };
+                 const firstEntryTs = empEntries.length > 0
+                     ? Math.min(...empEntries.map((e) => new Date(e.timestamp).getTime()))
+                     : null;
+                 const admStr = empData.admission_date ? String(empData.admission_date).split('T')[0] : null;
+                 const admDate = admStr ? stripTime(new Date(`${admStr}T00:00:00`)) : null;
+                 const firstEntryDate = firstEntryTs !== null ? stripTime(new Date(firstEntryTs)) : null;
+                 if (admDate && firstEntryDate) {
+                     effectiveStartDate = admDate.getTime() > firstEntryDate.getTime() ? admDate : firstEntryDate;
+                 } else if (admDate) {
+                     effectiveStartDate = admDate;
+                 } else if (firstEntryDate) {
+                     effectiveStartDate = firstEntryDate;
+                 }
+             }
+
              // Pre-process Previous Day for Night Shift Lookahead
             const prevDay = subDays(startPeriod, 1);
             const prevDayKey = format(prevDay, 'yyyy-MM-dd');
@@ -1817,6 +1882,19 @@ export const generateRelatorioExtrasPDF = async (employeeId: string, monthStr: s
                  
                  const hasAnyEntry = dayEntries.length > 0;
                  const isPast = day.getTime() < todayStart.getTime();
+
+                 let isPreAdmissionDay = false;
+                 if (effectiveStartDate && isPast && !hasAnyEntry) {
+                     const stripTime = (d: Date) => {
+                         const x = new Date(d.getTime());
+                         x.setHours(0, 0, 0, 0);
+                         return x;
+                     };
+                     const dayDate = stripTime(new Date(day.getTime()));
+                     if (dayDate.getTime() < effectiveStartDate.getTime()) {
+                         isPreAdmissionDay = true;
+                     }
+                 }
 
                  // --- Expected Minutes Calculation (Synced with Espelho) ---
                  let expectedMinutes = 0;
@@ -2104,7 +2182,7 @@ export const generateRelatorioExtrasPDF = async (employeeId: string, monthStr: s
                 const allowExtra = extrasTolTotal > 0 || extrasRawTotal >= minDaily;
                 const extrasMinutes = allowExtra ? netExtra : 0;
 
-                totalExtras += extrasMinutes;
+                if (!isPreAdmissionDay) totalExtras += extrasMinutes;
 
                  // Clean up consumed IDs for next iteration if they were used for lookahead
                  if (lookedAheadEntries.length > 0) {
