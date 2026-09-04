@@ -542,8 +542,8 @@ export const generateEspelhoPDF = async (employeeId?: string, referenceDate?: st
             }
 
             // IDs that are definitely 12x36 (Forced for specific IDs to ensure correctness regardless of DB)
-            const isTarget12x36 = (empCode === '30' || empCode === '12' || empCode === '10' || empCode === '31' || empCode === '13' || empCode === '28' || empCode === '11' || empCode === '5' || empCode === '22' || empCode === '14' || empCode === '26' || empCode === '24' || empCode === '25' || empCode === '29' || empCode === '34');
-            const shouldForce12x36 = ['10', '14', '24', '26', '29', '31', '25', '34'].includes(empCode);
+            const isTarget12x36 = (empCode === '30' || empCode === '12' || empCode === '10' || empCode === '31' || empCode === '13' || empCode === '28' || empCode === '11' || empCode === '5' || empCode === '22' || empCode === '14' || empCode === '26' || empCode === '24' || empCode === '25' || empCode === '29' || empCode === '34' || empCode === '38');
+            const shouldForce12x36 = ['10', '14', '24', '26', '29', '31', '25', '34', '38'].includes(empCode);
 
             if (isTarget12x36 && (!hasExplicitConfig || shouldForce12x36)) {
                 is12x36 = true;
@@ -1051,7 +1051,7 @@ export const generateEspelhoPDF = async (employeeId?: string, referenceDate?: st
                     else if (dow === 6) expectedMinutes = 480;
                     else expectedMinutes = 0;
                 } else if (is12x36) {
-                    if (empCode === '12' || empCode === '32' || empCode === '10' || empCode === '31' || empCode === '13' || empCode === '28' || empCode === '11' || empCode === '26' || empCode === '5' || empCode === '22' || empCode === '24' || empCode === '25' || empCode === '34') {
+                    if (empCode === '12' || empCode === '32' || empCode === '10' || empCode === '31' || empCode === '13' || empCode === '28' || empCode === '11' || empCode === '26' || empCode === '5' || empCode === '22' || empCode === '24' || empCode === '25' || empCode === '34' || empCode === '38') {
                         expectedMinutes = hasAnyEntry ? 660 : 0;
                     } else {
                         expectedMinutes = Math.abs(differenceInCalendarDays(day, anchorDay)) % 2 === 0 ? 660 : 0;
@@ -1789,8 +1789,8 @@ export const generateRelatorioExtrasPDF = async (employeeId: string, monthStr: s
                  if (['18', '19', '20'].includes(empCode)) { isSegDom0630_1550 = true; is12x36 = false; }
              }
 
-             const isTarget12x36 = (empCode === '30' || empCode === '12' || empCode === '10' || empCode === '31' || empCode === '13' || empCode === '28' || empCode === '11' || empCode === '5' || empCode === '22' || empCode === '14' || empCode === '26' || empCode === '24' || empCode === '25' || empCode === '29' || empCode === '34');
-             const shouldForce12x36 = ['10', '14', '24', '26', '29', '31', '25', '34'].includes(empCode);
+             const isTarget12x36 = (empCode === '30' || empCode === '12' || empCode === '10' || empCode === '31' || empCode === '13' || empCode === '28' || empCode === '11' || empCode === '5' || empCode === '22' || empCode === '14' || empCode === '26' || empCode === '24' || empCode === '25' || empCode === '29' || empCode === '34' || empCode === '38');
+             const shouldForce12x36 = ['10', '14', '24', '26', '29', '31', '25', '34', '38'].includes(empCode);
              if (isTarget12x36 && (!hasExplicitConfig || shouldForce12x36)) {
                  is12x36 = true;
                 isNightShift = ['10', '31', '26', '34'].includes(empCode);
@@ -1922,7 +1922,7 @@ export const generateRelatorioExtrasPDF = async (employeeId: string, monthStr: s
                      else if (dow === 6) expectedMinutes = 480;
                      else expectedMinutes = 0;
                  } else if (is12x36) {
-                     if (['12','32','10','31','13','28','11','26','5','22','24','25','34'].includes(empCode)) {
+                     if (['12','32','10','31','13','28','11','26','5','22','24','25','34','38'].includes(empCode)) {
                          expectedMinutes = hasAnyEntry ? 660 : 0;
                      } else {
                          expectedMinutes = Math.abs(differenceInCalendarDays(day, anchorDay)) % 2 === 0 ? 660 : 0;
