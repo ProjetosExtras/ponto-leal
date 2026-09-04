@@ -161,10 +161,25 @@ export default function WorkShifts() {
     return acc;
   }, {});
 
+  const DAY_LABELS: Record<string, string> = {
+    '0': 'Dom', '1': 'Seg', '2': 'Ter', '3': 'Qua',
+    '4': 'Qui', '5': 'Sex', '6': 'Sáb'
+  };
+
   const formatSchedule = (shift: WorkShift) => {
     if (shift.type === '12x36') {
-      const s = shift.schedule_json as { start?: string; end?: string } | undefined;
-      return `12x36 (${s?.start || '?'} - ${s?.end || '?'})`;
+      const s = shift.schedule_json as { start?: string; end?: string; days?: string[] } | undefined;
+      let details = `12x36 (${s?.start || '?'} - ${s?.end || '?'})`;
+      if (s?.days && s.days.length > 0) {
+        const dayLabels = s.days.map(d => DAY_LABELS[d] || d).join(', ');
+        details += ` · ${dayLabels}`;
+      }
+      return details;
+    }
+    const s = shift.schedule_json as Record<string, { start?: string; end?: string }> | undefined;
+    if (s && Object.keys(s).length > 0) {
+      const dayLabels = Object.keys(s).map(d => DAY_LABELS[d] || d).join(', ');
+      return `Semanal · ${dayLabels}`;
     }
     return "Semanal (Dias Fixos)";
   };

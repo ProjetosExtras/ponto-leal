@@ -65,10 +65,17 @@ export function WorkShiftDialog({ onSuccess, shiftToEdit, trigger }: WorkShiftDi
   const [isLoading, setIsLoading] = useState(false);
   // Estado local para gerenciar a grade semanal
   const [weeklySchedule, setWeeklySchedule] = useState<Record<string, { start: string; end: string; active: boolean }>>(() => {
-    // Inicializa com todos os dias ativos e horários padrão
     const initial: any = {};
     DAYS_OF_WEEK.forEach(day => {
       initial[day.id] = { start: "08:00", end: "17:00", active: true };
+    });
+    return initial;
+  });
+  // Estado para dias ativos na escala 12x36 (opcional)
+  const [twelveByThirtySixDays, setTwelveByThirtySixDays] = useState<Record<string, boolean>>(() => {
+    const initial: any = {};
+    DAYS_OF_WEEK.forEach(day => {
+      initial[day.id] = false;
     });
     return initial;
   });
@@ -106,6 +113,12 @@ export function WorkShiftDialog({ onSuccess, shiftToEdit, trigger }: WorkShiftDi
          const savedSchedule = shiftToEdit.schedule_json || {};
          form.setValue('start_time_12x36', savedSchedule.start || "07:00");
          form.setValue('end_time_12x36', savedSchedule.end || "19:00");
+         const newDays: any = {};
+         const savedDays = savedSchedule.days || [];
+         DAYS_OF_WEEK.forEach(day => {
+           newDays[day.id] = savedDays.includes(day.id);
+         });
+         setTwelveByThirtySixDays(newDays);
       }
     } else if (open) {
         // Resetar se for nova escala
@@ -116,6 +129,11 @@ export function WorkShiftDialog({ onSuccess, shiftToEdit, trigger }: WorkShiftDi
           initial[day.id] = { start: "08:00", end: "17:00", active: !isWeekend };
         });
         setWeeklySchedule(initial);
+        const initialDays: any = {};
+        DAYS_OF_WEEK.forEach(day => {
+          initialDays[day.id] = false;
+        });
+        setTwelveByThirtySixDays(initialDays);
     }
   }, [shiftToEdit, form, open]);
 
@@ -131,9 +149,13 @@ export function WorkShiftDialog({ onSuccess, shiftToEdit, trigger }: WorkShiftDi
       let schedule_json = {};
 
       if (values.type === '12x36') {
+        const activeDays = DAYS_OF_WEEK
+          .filter(day => twelveByThirtySixDays[day.id])
+          .map(day => day.id);
         schedule_json = {
           start: values.start_time_12x36,
-          end: values.end_time_12x36
+          end: values.end_time_12x36,
+          ...(activeDays.length > 0 ? { days: activeDays } : {})
         };
       } else {
         // Filtrar apenas dias ativos
@@ -253,33 +275,66 @@ export function WorkShiftDialog({ onSuccess, shiftToEdit, trigger }: WorkShiftDi
             </div>
 
             {shiftType === '12x36' && (
-              <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/20">
-                <FormField
-                  control={form.control}
-                  name="start_time_12x36"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Horário Entrada</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="end_time_12x36"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Horário Saída</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/20">
+                  <FormField
+                    control={form.control}
+                    name="start_time_12x36"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Horário Entrada</FormLabel>
+                        <FormControl>
+                          <Input type="time" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="end_time_12x36"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Horário Saída</FormLabel>
+                        <FormControl>
+                          <Input type="time" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2 border rounded-md p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-medium text-sm">Dias da Semana (Opcional)</h3>
+                    <span className="text-xs text-muted-foreground">
+                      Deixe sem marcar para usar o padrão de revezamento automático
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {DAYS_OF_WEEK.map((day) => (
+                      <div key={day.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted/30 transition-colors">
+                        <Checkbox 
+                          id={`12x36-day-${day.id}`}
+                          checked={twelveByThirtySixDays[day.id]} 
+                          onCheckedChange={(checked) => 
+                            setTwelveByThirtySixDays(prev => ({
+                              ...prev,
+                              [day.id]: checked === true
+                            }))
+                          }
+                        />
+                        <label 
+                          htmlFor={`12x36-day-${day.id}`}
+                          className={`text-sm cursor-pointer select-none ${twelveByThirtySixDays[day.id] ? "font-medium" : "text-muted-foreground"}`}
+                        >
+                          {day.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
